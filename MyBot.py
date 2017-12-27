@@ -8,9 +8,9 @@ targeted_planets = []
 targets = defaultdict(None)
 
 
-def find_new_target(ship, game_map):
+def find_nearest_entity(entity, ship, game_map):
     planets = {k: v for k, v in game_map.nearby_entities_by_distance(
-        ship).items() if isinstance(v[0], hlt.entity.Planet)}
+        ship).items() if isinstance(v[0], entity)}
 
     planets_sorted = sorted(zip(planets.keys(), planets.values()))
     for p in planets_sorted:
@@ -20,6 +20,14 @@ def find_new_target(ship, game_map):
             continue
         return planet
     return None
+
+
+def find_nearest_planet(ship, game_map):
+    return find_nearest_entity(hlt.entity.Planet, ship, game_map)
+
+
+def find_new_target(ship, game_map):
+    return find_nearest_planet(ship, game_map)
 
 
 def navigate_to(target, ship, game_map):
