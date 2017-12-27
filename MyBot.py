@@ -3,9 +3,19 @@
 import hlt
 import logging
 from collections import defaultdict
+from collections import namedtuple
 
+Target = namedtuple('Target', ['entity', 'distance'])
 targeted_entities = []
 targets = defaultdict(None)
+
+
+def is_planet(entity):
+    return isinstance(entity, hlt.entity.Planet)
+
+
+def is_ship(entity):
+    return isinstance(entity, hlt.entity.Ship)
 
 
 def find_nearest_entity(entity, ship, game_map, filters=[]):
@@ -21,16 +31,30 @@ def find_nearest_entity(entity, ship, game_map, filters=[]):
             needs_skipping = needs_skipping or f(entity)
         if needs_skipping:
             continue
-        return entity
+        return Target(entity, e[0])
     return None
 
 
-def find_nearest_planet(ship, game_map):
-    return find_nearest_entity(hlt.entity.Planet, ship, game_map, [lambda p: p.is_owned()])
+def find_nearest_planet(ship, game_map, filters=[]):
+    return find_nearest_entity(hlt.entity.Planet, ship, game_map, filters)
+
+
+def find_nearest_ship(ship, game_map, filters=[]):
+    return find_nearest_entity(hlt.entity.Ship, ship, game_map, filters)
 
 
 def find_new_target(ship, game_map):
-    return find_nearest_planet(ship, game_map)
+    target = find_nearest_planet(ship, game_map, [lambda p: p.is_owned()])
+    if target is None:
+        nearest_enemy_ship = find_nearest_ship(
+            ship, game_map, [lambda s: s.owner == game_map.get_me()])
+        nearest_enemy_planet = find_nearest_planet(
+            ship, game_map, [lambda s: s.owner == game_map.get_me()])
+        if nearest_enemy_planet.distance < nearest_enemy_ship.distance:
+            target = nearest_enemy_planet
+        else:
+            target = nearest_enemy_ship
+    return target.entity
 
 
 def navigate_to(target, ship, game_map):
@@ -60,11 +84,12 @@ while True:
             targets[ship] = find_new_target(ship, game_map)
 
         if targets.get(ship) is not None:
-            if ship.can_dock(targets[ship]):
-                command_queue.append(ship.dock(targets[ship]))
-                targets[ship] = None
-            else:
-                navigate_to(targets[ship], ship, game_map)
+            if is_planet(targets[ship]):
+                if ship.can_dock(targets[ship]):
+                    command_queue.append(ship.dock(targets[ship]))
+                    targets[ship] = None
+                    continue
+            navigate_to(targets[ship], ship, game_map)
 
     game.send_command_queue(command_queue)
     # TURN END
