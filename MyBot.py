@@ -10,7 +10,7 @@ CLUSTER = 3
 nav_count = 0
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'target'])
-assignees = defaultdict(int)
+assignees = defaultdict(set)
 targets = defaultdict()
 planets_by_size = []
 average_radius = 0
@@ -27,9 +27,16 @@ def is_ship(entity):
 
 
 def is_enemy_or_mine_and_full(planet, game_map):
+    global assignees
     if planet.is_owned():
         if planet.owner == game_map.get_me():
+            if len(assignees[planet]) + len(planet.all_docked_ships()) >= planet.num_docking_spots - 1:
+                if len(assignees[planet]) > 0:
+                    logging.info(
+                        f'{len(assignees[planet])} + {len(planet.all_docked_ships())} >= {planet.num_docking_spots}')
+                return True
             if planet.is_full():
+                logging.info('Planet full')
                 return True
         else:
             return True
@@ -49,7 +56,7 @@ def is_ship_stuck(ship):
 
 
 def find_nearest_entity(entity, ship, game_map, filters=[]):
-    filters.append(lambda e, g: assignees[e] > CLUSTER)
+    filters.append(lambda e, g: len(assignees[e]) > CLUSTER)
 
     entities = {k: v for k, v in game_map.nearby_entities_by_distance(
         ship).items() if isinstance(v[0], entity)}
@@ -77,13 +84,13 @@ def find_nearest_ship(ship, game_map, filters=[]):
 def find_new_target(ship, game_map):
     options = []
 
-    options.append(TargetOption(priority=5, target=find_nearest_planet(
+    options.append(TargetOption(priority=3, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full])))
 
-    options.append(TargetOption(priority=7, target=find_nearest_planet(
+    options.append(TargetOption(priority=9, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full, lambda p, g: p.radius < average_radius])))
 
-    options.append(TargetOption(priority=3, target=find_nearest_ship(
+    options.append(TargetOption(priority=6, target=find_nearest_ship(
         ship, game_map, [lambda s, g: s.owner == g.get_me()])))
 
     sorted_options = sorted(
@@ -94,6 +101,8 @@ def find_new_target(ship, game_map):
 
 
 def navigate_to(target, ship, game_map):
+    global assignees
+    global targets
     navigate_command = ship.navigate(
         ship.closest_point_to(target),
         game_map,
@@ -105,11 +114,11 @@ def navigate_to(target, ship, game_map):
         global nav_count
         nav_count += 1
         targets[ship.id] = target
-        assignees[target] += 1
+        assignees[target].add(ship.id)
         command_queue.append(navigate_command)
 
 
-game = hlt.Game("Settler-v9")
+game = hlt.Game("Settler-v10")
 logging.info("Starting my Settler bot!")
 init = True
 
@@ -128,6 +137,14 @@ while True:
 
     command_queue = []
     for ship in game_map.get_me().all_ships():
+
+        if ship.docking_status == ship.DockingStatus.DOCKED:
+            if targets.get(ship.id) is not None:
+                if ship.id in assignees[targets[ship.id]]:
+                    logging.info(f'Ship {ship.id} docked')
+                    assignees[targets[ship.id]].remove(ship.id)
+                    targets[ship.id] = None
+
         if ship.docking_status != ship.DockingStatus.UNDOCKED:
             continue
 
@@ -136,6 +153,7 @@ while True:
         if is_ship_stuck(ship):
             target = None
 
+        new_target = False
         if target is None:
             target = find_new_target(ship, game_map)
             new_target = True
@@ -144,15 +162,14 @@ while True:
             if is_planet(target):
                 if ship.can_dock(target):
                     command_queue.append(ship.dock(target))
-                    targets[ship.id] = None
                     continue
-            if new_target:
-                navigate_to(target, ship, game_map)
+            # if new_target:
+            navigate_to(target, ship, game_map)
         targets[ship.id] = target
 
-    logging.info(f'nav_count {nav_count}')
-    logging.info(f'ships_counts {len(game_map.get_me().all_ships())}')
-    logging.info(f'targets {len(targets)}')
+    # logging.info(f'nav_count {nav_count}')
+    # logging.info(f'ships_counts {len(game_map.get_me().all_ships())}')
+    # logging.info(f'targets {len(targets)}')
     nav_count = 0
     game.send_command_queue(command_queue)
     # TURN END
