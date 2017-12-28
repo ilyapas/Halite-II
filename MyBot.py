@@ -22,6 +22,18 @@ def is_ship(entity):
     return isinstance(entity, hlt.entity.Ship)
 
 
+def is_ship_stuck(ship):
+    if copies.get(ship.id) is None:
+        copies[ship.id] = ship
+
+    result = False
+    if ship.calculate_distance_between(copies[ship.id]) == 0:
+        result = True
+
+    copies[ship.id] = ship
+    return result
+
+
 def find_nearest_entity(entity, ship, game_map, filters=[]):
     filters.append(lambda e: targeted_entities[e] > CLUSTER)
 
@@ -90,14 +102,8 @@ while True:
 
         target = targets.get(ship.id)
 
-        if copies.get(ship.id) is None:
-            copies[ship.id] = ship
-
-        if ship.calculate_distance_between(copies[ship.id]) == 0:
-            logging.info('Ship stuck')
+        if is_ship_stuck(ship):
             target = None
-
-        copies[ship.id] = ship
 
         if target is None:
             target = find_new_target(ship, game_map)
