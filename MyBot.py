@@ -10,8 +10,10 @@ CLUSTER = 3
 nav_count = 0
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'target'])
-targeted_entities = defaultdict(int)
+assignees = defaultdict(int)
 targets = defaultdict()
+planets_by_size = []
+average_radius = 0
 
 copies = dict()
 
@@ -47,7 +49,7 @@ def is_ship_stuck(ship):
 
 
 def find_nearest_entity(entity, ship, game_map, filters=[]):
-    filters.append(lambda e, g: targeted_entities[e] > CLUSTER)
+    filters.append(lambda e, g: assignees[e] > CLUSTER)
 
     entities = {k: v for k, v in game_map.nearby_entities_by_distance(
         ship).items() if isinstance(v[0], entity)}
@@ -75,10 +77,13 @@ def find_nearest_ship(ship, game_map, filters=[]):
 def find_new_target(ship, game_map):
     options = []
 
-    options.append(TargetOption(5, find_nearest_planet(
+    options.append(TargetOption(priority=5, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full])))
 
-    options.append(TargetOption(3, find_nearest_ship(
+    options.append(TargetOption(priority=7, target=find_nearest_planet(
+        ship, game_map, [is_enemy_or_mine_and_full, lambda p, g: p.radius < average_radius])))
+
+    options.append(TargetOption(priority=3, target=find_nearest_ship(
         ship, game_map, [lambda s, g: s.owner == g.get_me()])))
 
     sorted_options = sorted(
@@ -100,15 +105,26 @@ def navigate_to(target, ship, game_map):
         global nav_count
         nav_count += 1
         targets[ship.id] = target
-        targeted_entities[target] += 1
+        assignees[target] += 1
         command_queue.append(navigate_command)
 
 
-game = hlt.Game("Settler-v8")
+game = hlt.Game("Settler-v9")
 logging.info("Starting my Settler bot!")
+init = True
 
 while True:
     game_map = game.update_map()
+
+    if init:
+        planets = [p for p in game_map.all_planets()]
+        planets_by_size = list(
+            reversed(sorted(planets, key=lambda p: p.radius)))
+        logging.info(planets_by_size)
+
+        rad_list = [p.radius for p in game_map.all_planets()]
+        average_radius = sum(rad_list) / len(rad_list)
+        init = False
 
     command_queue = []
     for ship in game_map.get_me().all_ships():
