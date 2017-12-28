@@ -22,6 +22,16 @@ def is_ship(entity):
     return isinstance(entity, hlt.entity.Ship)
 
 
+def is_enemy_or_mine_and_full(planet, game_map):
+    if planet.is_owned():
+        if planet.owner == game_map.get_me():
+            if planet.is_full():
+                return True
+        else:
+            return True
+    return False
+
+
 def is_ship_stuck(ship):
     if copies.get(ship.id) is None:
         copies[ship.id] = ship
@@ -35,7 +45,7 @@ def is_ship_stuck(ship):
 
 
 def find_nearest_entity(entity, ship, game_map, filters=[]):
-    filters.append(lambda e: targeted_entities[e] > CLUSTER)
+    filters.append(lambda e, g: targeted_entities[e] > CLUSTER)
 
     entities = {k: v for k, v in game_map.nearby_entities_by_distance(
         ship).items() if isinstance(v[0], entity)}
@@ -45,7 +55,7 @@ def find_nearest_entity(entity, ship, game_map, filters=[]):
         entity = e[1][0]
         needs_skipping = False
         for f in filters:
-            needs_skipping = needs_skipping or f(entity)
+            needs_skipping = needs_skipping or f(entity, game_map)
         if needs_skipping:
             continue
         return Target(entity, e[0])
@@ -61,12 +71,13 @@ def find_nearest_ship(ship, game_map, filters=[]):
 
 
 def find_new_target(ship, game_map):
-    target = find_nearest_planet(ship, game_map, [lambda p: p.is_owned()])
+    target = find_nearest_planet(
+        ship, game_map, [is_enemy_or_mine_and_full])
     if target.entity is None:
         nearest_enemy_ship = find_nearest_ship(
-            ship, game_map, [lambda s: s.owner == game_map.get_me()])
+            ship, game_map, [lambda s, g: s.owner == g.get_me()])
         # nearest_enemy_planet = find_nearest_planet(
-        #     ship, game_map, [lambda s: s.owner == game_map.get_me()])
+        #     ship, game_map, [lambda s, g: s.owner == g.get_me()])
         # if nearest_enemy_planet.distance < nearest_enemy_ship.distance:
         #     target = nearest_enemy_planet
         # else:
@@ -89,7 +100,7 @@ def navigate_to(target, ship, game_map):
         command_queue.append(navigate_command)
 
 
-game = hlt.Game("Settler-v5")
+game = hlt.Game("Settler-v6")
 logging.info("Starting my Settler bot!")
 
 while True:
