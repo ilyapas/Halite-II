@@ -2,12 +2,14 @@
 """
 import hlt
 import logging
+import math
 from collections import defaultdict
 from collections import namedtuple
 
-CLUSTER = 1
+CLUSTER = 3
 nav_count = 0
 Target = namedtuple('Target', ['entity', 'distance'])
+TargetOption = namedtuple('TargetOption', ['priority', 'target'])
 targeted_entities = defaultdict(int)
 targets = defaultdict()
 
@@ -59,7 +61,7 @@ def find_nearest_entity(entity, ship, game_map, filters=[]):
         if needs_skipping:
             continue
         return Target(entity, e[0])
-    return Target(None, 0)
+    return Target(None, math.inf)
 
 
 def find_nearest_planet(ship, game_map, filters=[]):
@@ -71,17 +73,18 @@ def find_nearest_ship(ship, game_map, filters=[]):
 
 
 def find_new_target(ship, game_map):
-    target = find_nearest_planet(
-        ship, game_map, [is_enemy_or_mine_and_full])
-    if target.entity is None:
-        nearest_enemy_ship = find_nearest_ship(
-            ship, game_map, [lambda s, g: s.owner == g.get_me()])
-        # nearest_enemy_planet = find_nearest_planet(
-        #     ship, game_map, [lambda s, g: s.owner == g.get_me()])
-        # if nearest_enemy_planet.distance < nearest_enemy_ship.distance:
-        #     target = nearest_enemy_planet
-        # else:
-        target = nearest_enemy_ship
+    options = []
+
+    options.append(TargetOption(5, find_nearest_planet(
+        ship, game_map, [is_enemy_or_mine_and_full])))
+
+    options.append(TargetOption(3, find_nearest_ship(
+        ship, game_map, [lambda s, g: s.owner == g.get_me()])))
+
+    sorted_options = sorted(
+        options, key=lambda opt: opt.target.distance / opt.priority)
+
+    target = sorted_options[0].target
     return target.entity
 
 
@@ -100,7 +103,7 @@ def navigate_to(target, ship, game_map):
         command_queue.append(navigate_command)
 
 
-game = hlt.Game("Settler-v6")
+game = hlt.Game("Settler-v7")
 logging.info("Starting my Settler bot!")
 
 while True:
