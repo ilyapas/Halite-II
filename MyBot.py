@@ -93,7 +93,8 @@ def navigate_to(target, ship, game_map):
         ship.closest_point_to(target),
         game_map,
         speed=int(hlt.constants.MAX_SPEED),
-        ignore_ships=False)
+        ignore_ships=False,
+        angular_step=3)
 
     if navigate_command:
         global nav_count
@@ -103,7 +104,7 @@ def navigate_to(target, ship, game_map):
         command_queue.append(navigate_command)
 
 
-game = hlt.Game("Settler-v7")
+game = hlt.Game("Settler-v8")
 logging.info("Starting my Settler bot!")
 
 while True:
