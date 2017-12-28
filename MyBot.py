@@ -18,6 +18,10 @@ average_radius = 0
 copies = dict()
 
 
+def entity_key(entity):
+    return (type(entity), entity.id)
+
+
 def is_planet(entity):
     return isinstance(entity, hlt.entity.Planet)
 
@@ -30,10 +34,10 @@ def is_enemy_or_mine_and_full(planet, game_map):
     global assignees
     if planet.is_owned():
         if planet.owner == game_map.get_me():
-            if len(assignees[planet]) + len(planet.all_docked_ships()) >= planet.num_docking_spots - 1:
+            if len(assignees[entity_key(planet)]) + len(planet.all_docked_ships()) >= planet.num_docking_spots:
                 if len(assignees[planet]) > 0:
                     logging.info(
-                        f'{len(assignees[planet])} + {len(planet.all_docked_ships())} >= {planet.num_docking_spots}')
+                        f'{len(assignees[entity_key(planet)])} + {len(planet.all_docked_ships())} >= {planet.num_docking_spots}')
                 return True
             if planet.is_full():
                 logging.info('Planet full')
@@ -56,7 +60,7 @@ def is_ship_stuck(ship):
 
 
 def find_nearest_entity(entity, ship, game_map, filters=[]):
-    filters.append(lambda e, g: len(assignees[e]) > CLUSTER)
+    filters.append(lambda e, g: len(assignees[entity_key(e)]) > CLUSTER)
 
     entities = {k: v for k, v in game_map.nearby_entities_by_distance(
         ship).items() if isinstance(v[0], entity)}
@@ -84,13 +88,13 @@ def find_nearest_ship(ship, game_map, filters=[]):
 def find_new_target(ship, game_map):
     options = []
 
-    options.append(TargetOption(priority=3, target=find_nearest_planet(
+    options.append(TargetOption(priority=5, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full])))
 
-    options.append(TargetOption(priority=9, target=find_nearest_planet(
+    options.append(TargetOption(priority=7, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full, lambda p, g: p.radius < average_radius])))
 
-    options.append(TargetOption(priority=6, target=find_nearest_ship(
+    options.append(TargetOption(priority=3, target=find_nearest_ship(
         ship, game_map, [lambda s, g: s.owner == g.get_me()])))
 
     sorted_options = sorted(
@@ -114,7 +118,9 @@ def navigate_to(target, ship, game_map):
         global nav_count
         nav_count += 1
         targets[ship.id] = target
-        assignees[target].add(ship.id)
+        assignees[entity_key(target)].add(ship.id)
+        logging.info(f'target for ship {ship.id}: {entity_key(target)}')
+        logging.info(assignees[entity_key(target)])
         command_queue.append(navigate_command)
 
 
@@ -140,9 +146,9 @@ while True:
 
         if ship.docking_status == ship.DockingStatus.DOCKED:
             if targets.get(ship.id) is not None:
-                if ship.id in assignees[targets[ship.id]]:
+                if ship.id in assignees[entity_key(targets[ship.id])]:
                     logging.info(f'Ship {ship.id} docked')
-                    assignees[targets[ship.id]].remove(ship.id)
+                    assignees[entity_key(targets[ship.id])].remove(ship.id)
                     targets[ship.id] = None
 
         if ship.docking_status != ship.DockingStatus.UNDOCKED:
