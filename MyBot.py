@@ -7,6 +7,8 @@ from collections import defaultdict
 from collections import namedtuple
 
 CLUSTER = 3
+TARGET_RECALC = True
+
 nav_count = 0
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'squad_size', 'target'])
@@ -32,11 +34,10 @@ def is_ship(entity):
 
 
 def is_enemy_or_mine_and_full(planet, game_map):
-    global assignees
     if planet.is_owned():
         if planet.owner == game_map.get_me():
-            if len(assignees[entity_key(planet)]) + len(planet.all_docked_ships()) >= planet.num_docking_spots:
-                return True
+            # if len(assignees[entity_key(planet)]) + len(planet.all_docked_ships()) >= planet.num_docking_spots:
+            #     return True
             if planet.is_full():
                 return True
         else:
@@ -57,8 +58,6 @@ def is_ship_stuck(ship):
 
 
 def find_nearest_entity(entity, ship, game_map, filters=[]):
-    filters.append(lambda e, g: len(assignees[entity_key(e)]) > CLUSTER)
-
     entities = {k: v for k, v in game_map.nearby_entities_by_distance(
         ship).items() if isinstance(v[0], entity)}
 
@@ -102,8 +101,20 @@ def find_new_target(ship, game_map):
         options.append(TargetOption(
             priority=15, squad_size=1, target=docked_enemy_ship))
 
-    sorted_options = sorted(
-        options, key=lambda opt: opt.target.distance / opt.priority)
+    nearest_enemy_planet = find_nearest_planet(
+        ship, game_map, [lambda p, g: p.owner == g.get_me()])
+    if nearest_enemy_planet.entity is not None:
+        docked_enemy_ship = find_nearest_ship(
+            ship, game_map, [lambda s, g: s.id not in nearest_enemy_planet.entity.all_docked_ships()])
+        options.append(TargetOption(
+            priority=12, squad_size=1, target=docked_enemy_ship))
+
+    def evaluate_option(opt):
+        result = opt.target.distance / opt.priority
+        logging.info((result, opt))
+        return result
+
+    sorted_options = sorted(options, key=evaluate_option)
 
     return sorted_options[0]
 
@@ -169,16 +180,16 @@ while True:
         if is_ship_stuck(ship):
             target = None
 
-        # if target is None:
-        t = find_new_target(ship, game_map)
-        if t.target.entity is not None:
-            key = entity_key(t.target.entity)
-            squads[key].add(ship.id)
-            logging.info(squads)
-            if len(squads[key]) >= t.squad_size:
-                for s in squads[key]:
-                    targets[s] = t.target.entity
-                squads[key].clear()
+        if target is None or TARGET_RECALC:
+            t = find_new_target(ship, game_map)
+            if t.target.entity is not None:
+                key = entity_key(t.target.entity)
+                squads[key].add(ship.id)
+                logging.info(squads)
+                if len(squads[key]) >= t.squad_size:
+                    for s in squads[key]:
+                        targets[s] = t.target.entity
+                    squads[key].clear()
 
     for ship in game_map.get_me().all_ships():
         target = targets.get(ship.id)
