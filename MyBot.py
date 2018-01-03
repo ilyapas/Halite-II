@@ -57,6 +57,11 @@ def is_ship_stuck(ship):
     return result
 
 
+def empty_planet_ratio(game_map):
+    empty_planets = [p for p in game_map.all_planets() if not p.is_owned()]
+    return 1 + (len(empty_planets) / len(game_map.all_planets()))
+
+
 def find_nearest_entity(entity, ship, game_map, filters=[]):
     entities = {k: v for k, v in game_map.nearby_entities_by_distance(
         ship).items() if isinstance(v[0], entity)}
@@ -73,12 +78,30 @@ def find_nearest_entity(entity, ship, game_map, filters=[]):
     return Target(None, math.inf)
 
 
+def find_nearby_entities(entity, target, game_map, radius, filters=[]):
+    entities = [v for k, v in game_map.nearby_entities_by_distance(
+        target).items() if isinstance(v[0], entity) if k < radius]
+    filtered_entities = []
+    for e in entities:
+        needs_skipping = False
+        for f in filters:
+            needs_skipping = needs_skipping or f(e[0], game_map)
+        if needs_skipping:
+            continue
+        filtered_entities.append(e[0])
+    return filtered_entities
+
+
 def find_nearest_planet(ship, game_map, filters=[]):
     return find_nearest_entity(hlt.entity.Planet, ship, game_map, filters)
 
 
 def find_nearest_ship(ship, game_map, filters=[]):
     return find_nearest_entity(hlt.entity.Ship, ship, game_map, filters)
+
+
+def find_nearby_ships(target, game_map, radius, filters=[]):
+    return find_nearby_entities(hlt.entity.Ship, target, game_map, radius, filters)
 
 
 def find_new_target(ship, game_map):
@@ -114,9 +137,20 @@ def find_new_target(ship, game_map):
         logging.info((result, opt))
         return result
 
-    sorted_options = sorted(options, key=evaluate_option)
+    best_option = sorted(options, key=evaluate_option)[0]
 
-    return sorted_options[0]
+    nearby_enemy_ships = find_nearby_ships(
+        best_option.target.entity,  game_map, radius=10, filters=[lambda s, g: s.owner == g.get_me()])
+    nearby_own_ships = find_nearby_ships(
+        ship, game_map, radius=10, filters=[lambda s, g: s.owner != g.get_me()])
+
+    if len(nearby_enemy_ships) > len(nearby_own_ships):
+        nearest_own_planet = find_nearest_planet(
+            ship, game_map, [lambda p, g: p.owner != g.get_me()])
+        retreat = TargetOption(0, 0, nearest_own_planet)
+        logging.info(f'Ship {ship.id} retreating to {nearest_own_planet}')
+
+    return best_option
 
 
 def navigate_to(target, ship, game_map):
@@ -139,7 +173,7 @@ def navigate_to(target, ship, game_map):
         command_queue.append(navigate_command)
 
 
-game = hlt.Game("Settler-v12")
+game = hlt.Game("Settler-v13")
 logging.info("Starting my Settler bot!")
 init = True
 
