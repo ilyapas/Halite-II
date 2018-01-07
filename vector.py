@@ -1,4 +1,4 @@
-""" 
+"""
 The MIT License (MIT)
 Copyright (c) 2015 Mat Leonard
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -29,27 +29,48 @@ class Vector(object):
         else:
             self.values = args
 
+    @classmethod
+    def from_polar(cls, mag, angle):
+        """ Create a vector from polar coordinates: magniture and angle """
+        return cls(mag * math.cos(math.radians(angle)), mag * math.sin(math.radians(angle)))
+
+    @classmethod
+    def from_entity(cls, entity):
+        """ Create a vector from an entity, which has properties x and y """
+        return cls(entity.x, entity.y)
+
     def norm(self):
         """ Returns the norm (length, magnitude) of the vector """
         return math.sqrt(sum(comp**2 for comp in self))
 
     def argument(self):
-        """ Returns the argument of the vector, the angle clockwise from +y."""
-        arg_in_rad = math.acos(Vector(0, 1) * self / self.norm())
-        arg_in_deg = math.degrees(arg_in_rad)
-        if self.values[0] < 0:
-            return 360 - arg_in_deg
-        else:
-            return arg_in_deg
+        """ Returns the argument of the vector, the angle counter-clockwise from +x."""
+        return math.degrees(math.atan2(self.values[1], self.values[0])) % 360
 
     def normalize(self):
         """ Returns a normalized unit vector """
         norm = self.norm()
+        if norm == 0:
+            return self
         normed = tuple(comp / norm for comp in self)
         return Vector(*normed)
 
+    def limit(self, mag):
+        """ Returns a vector with magnitude limited to the passed value """
+        norm = self.norm()
+        if norm <= mag:
+            return self
+        limited = tuple(comp / mag for comp in self)
+        return Vector(*limited)
+
+    def set_magnitude(self, mag):
+        """ Returns a vector with same direction but a new magnitude """
+        norm = self.norm()
+        scaled = tuple(comp * mag / norm for comp in self)
+        return Vector(*scaled)
+
     def rotate(self, *args):
-        """ Rotate this vector. If passed a number, assumes this is a 
+        """ Rotate this vector. If passed a number, assumes this is a
             2D vector and rotates by the passed value in degrees.  Otherwise,
             assumes the passed value is a list acting as a matrix which rotates the vector.
         """
@@ -115,7 +136,7 @@ class Vector(object):
         """ Called if 4*self for instance """
         return self.__mul__(other)
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         if type(other) == type(1) or type(other) == type(1.0):
             divided = tuple(a / other for a in self)
             return Vector(*divided)
