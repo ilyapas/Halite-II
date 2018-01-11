@@ -58,14 +58,15 @@ class Vector(object):
     def limit(self, mag):
         """ Returns a vector with magnitude limited to the passed value """
         norm = self.norm()
-        if norm <= mag:
-            return self
-        limited = tuple(comp / mag for comp in self)
-        return Vector(*limited)
+        if norm > mag:
+            return self.set_magnitude(mag)
+        return self
 
     def set_magnitude(self, mag):
         """ Returns a vector with same direction but a new magnitude """
         norm = self.norm()
+        if norm == 0:
+            return self
         scaled = tuple(comp * mag / norm for comp in self)
         return Vector(*scaled)
 
