@@ -52,16 +52,23 @@ class CommandCenter(object):
 
         best_option = sorted(options, key=evaluate_option)[0]
 
-        # nearby_enemy_ships = find_nearby_ships(
-        #     best_option.target.entity,  game_map, radius=10, filters=[lambda s, g: s.owner == g.get_me()])
-        # nearby_own_ships = find_nearby_ships(
-        #     ship, game_map, radius=10, filters=[lambda s, g: s.owner != g.get_me()])
+        nearby_enemy_ships = find_nearby_ships(
+            best_option.target.entity,  self.game_map, radius=10, filters=[lambda s, g: s.owner == g.get_me()])
+        nearby_own_ships = find_nearby_ships(
+            ship, self.game_map, radius=20, filters=[lambda s, g: s.owner != g.get_me()])
 
-        # if len(nearby_enemy_ships) > len(nearby_own_ships):
-        #     nearest_own_planet = find_nearest_planet(
-        #         ship, game_map, [lambda p, g: p.owner != g.get_me()])
-        #     retreat = TargetOption(0, 0, nearest_own_planet)
-        #     logging.info(f'Ship {ship.id} retreating to {nearest_own_planet}')
+        average_dist_to_target = 0
+        if len(nearby_own_ships) > 0:
+            average_dist_to_target = sum([s.calculate_distance_between(best_option.target.entity)
+                                          for s in nearby_own_ships]) / len(nearby_own_ships)
+
+        if len(nearby_enemy_ships) > len(nearby_own_ships) and best_option.target.distance < average_dist_to_target:
+            nearest_own_planet = find_nearest_planet(
+                ship, self.game_map, [lambda p, g: p.owner != g.get_me()])
+            if nearest_own_planet.entity is not None:
+                best_option = TargetOption(0, 0, nearest_own_planet)
+                logging.info(
+                    f'Ship {ship.id} retreating to {nearest_own_planet}')
 
         return best_option.target
 
@@ -90,25 +97,11 @@ def is_ship(entity):
 def is_enemy_or_mine_and_full(planet, game_map):
     if planet.is_owned():
         if planet.owner == game_map.get_me():
-            # if len(assignees[entity_key(planet)]) + len(planet.all_docked_ships()) >= planet.num_docking_spots:
-            #     return True
             if planet.is_full():
                 return True
         else:
             return True
     return False
-
-
-# def is_ship_stuck(ship):
-#     if copies.get(ship.id) is None:
-#         copies[ship.id] = ship
-
-#     result = False
-#     if ship.calculate_distance_between(copies[ship.id]) == 0:
-#         result = True
-
-#     copies[ship.id] = ship
-#     return result
 
 
 def empty_planet_ratio(game_map):
