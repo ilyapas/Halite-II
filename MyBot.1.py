@@ -136,7 +136,8 @@ def navigate_to(target, ship, game_map):
         assignees[entity_key(target)].add(ship.id)
         logging.info(f'target for ship {ship.id}: {entity_key(target)}')
         logging.info(assignees[entity_key(target)])
-        command_queue.append(navigate_command)
+        command_queue.append(ship.thrust(
+            navigate_command[0], navigate_command[1]))
 
 
 game = hlt.Game("Settler-v12")
