@@ -18,14 +18,23 @@ class Starfighter(object):
 
     def set_target(self, x, y):
         self.target = Vector(x, y)
+        dist = (self.target - self.position).norm()
+        if dist > 10:
+            self.flocking = 0.2
+        else:
+            self.flocking = 0
 
-    def update(self, other_fighters):
+    def set_velocity(self, speed, angle):
+        self.velocity = Vector.from_polar(speed, angle)
+
+    def update(self, other_fighters, obstacles=[]):
 
         logging.info(f'Me {self}')
         logging.info(f'Others {other_fighters}')
 
-        self.apply_force(self.arrive(self.target))
-        self.apply_force(self.flock(other_fighters) * 0.2)
+        # self.apply_force(self.arrive(self.target))
+        self.apply_force(self.flock(other_fighters) * self.flocking)
+        self.apply_force(self.avoid(obstacles) * 1.0)
 
         self.velocity += self.acceleration
         self.velocity = self.velocity.limit(MAX_SPEED)
@@ -43,7 +52,7 @@ class Starfighter(object):
         return steer
 
     def arrive(self, target):
-        slow_down_zone = 10
+        slow_down_zone = 5
         desired = target - self.position
         dist = desired.norm()
         if dist < slow_down_zone:
@@ -60,7 +69,7 @@ class Starfighter(object):
         coh = self.cohesion(other_fighters)
         sep *= 1.5
         ali *= 1.0
-        coh *= 1.0
+        coh *= 0.2
         return sep + ali + coh
 
     def separate(self, targets):
@@ -84,7 +93,7 @@ class Starfighter(object):
         return steer
 
     def align(self, targets):
-        neighborhood = 50
+        neighborhood = 30
         average_velocity = Vector()
         count = 0
         for target in targets:
@@ -102,7 +111,7 @@ class Starfighter(object):
         return Vector()
 
     def cohesion(self, targets):
-        neighborhood = 50
+        neighborhood = 30
         average_position = Vector()
         count = 0
         for target in targets:
@@ -116,3 +125,28 @@ class Starfighter(object):
             logging.info(f'Cohesion {steer}')
             return steer
         return Vector()
+
+    def avoid(self, obstacles):
+        max_see_ahead = 10
+        ahead = self.position + self.velocity.normalize() * max_see_ahead
+        ahead2 = self.position + self.velocity.normalize() * max_see_ahead * 0.5
+
+        def line_intersects_circle(ahead, ahead2, circle_center, circle_radius):
+            return (circle_center - ahead).norm <= circle_radius or (circle_center - ahead2).norm <= circle_radius
+
+        most_threatening = None
+        distance_to_most_threatening = 0
+        for obstacle in obstacles:
+            obstacle_position = Vector(obstacle.x, obstacle.y)
+            distance = (self.position - obstacle_position).norm()
+            collision = line_intersects_circle(
+                ahead, ahead2, obstacle_position, obstacle.radius + 2)
+            if collision and (most_threatening is None or distance < distance_to_most_threatening):
+                most_threatening = obstacle
+                distance_to_most_threatening = distance
+
+        steer = Vector()
+        if most_threatening:
+            steer = ahead - Vector(most_threatening.x, most_threatening.y)
+            steer.set_magnitude(MAX_SPEED)
+        return steer

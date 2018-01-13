@@ -30,6 +30,7 @@ while True:
 
     for ship in game_map.get_me().all_ships():
         if ship.docking_status != ship.DockingStatus.UNDOCKED:
+            # fighters.pop(ship.id)
             continue
 
         target = cc.select_target(ship)
@@ -39,13 +40,15 @@ while True:
             command_queue.append(ship.dock(target.entity))
             continue
 
+        target_point = ship.closest_point_to(target.entity)
         speed, angle = ship.navigate(
-            ship.closest_point_to(target.entity),
+            target_point,
             game_map,
             speed=int(hlt.constants.MAX_SPEED),
             ignore_ships=False,
             angular_step=3)
         fighter.set_velocity(speed, angle)
+        fighter.set_target(target_point.x, target_point.y)
         other_fighters_position = [fighters[k]
                                    for k in fighters.keys() if k != ship.id]
         fighter.update(other_fighters_position)

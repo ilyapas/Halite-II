@@ -59,6 +59,7 @@ class Entity:
         :rtype: Position
         """
         angle = target.calculate_angle_between(self)
+        angle += 3 + self.id % 5
         radius = target.radius + min_distance
         x = target.x + radius * math.cos(math.radians(angle))
         y = target.y + radius * math.sin(math.radians(angle))
@@ -206,7 +207,7 @@ class Planet(Entity):
 class Ship(Entity):
     """
     A ship in the game.
-    
+
     :ivar id: The ship ID.
     :ivar x: The ship x-coordinate.
     :ivar y: The ship y-coordinate.
@@ -232,7 +233,8 @@ class Ship(Entity):
         self.radius = constants.SHIP_RADIUS
         self.health = hp
         self.docking_status = docking_status
-        self.planet = planet if (docking_status is not Ship.DockingStatus.UNDOCKED) else None
+        self.planet = planet if (
+            docking_status is not Ship.DockingStatus.UNDOCKED) else None
         self._docking_progress = progress
         self._weapon_cooldown = cooldown
 
@@ -292,7 +294,7 @@ class Ship(Entity):
         """
         # Assumes a position, not planet (as it would go to the center of the planet otherwise)
         if max_corrections <= 0:
-            return None
+            return 0, 0
         distance = self.calculate_distance_between(target)
         angle = self.calculate_angle_between(target)
         ignore = () if not (ignore_ships or ignore_planets) \
@@ -300,12 +302,15 @@ class Ship(Entity):
             else Planet if (ignore_planets and not ignore_ships) \
             else Entity
         if avoid_obstacles and game_map.obstacles_between(self, target, ignore):
-            new_target_dx = math.cos(math.radians(angle + angular_step)) * distance
-            new_target_dy = math.sin(math.radians(angle + angular_step)) * distance
-            new_target = Position(self.x + new_target_dx, self.y + new_target_dy)
+            new_target_dx = math.cos(math.radians(
+                angle + angular_step)) * distance
+            new_target_dy = math.sin(math.radians(
+                angle + angular_step)) * distance
+            new_target = Position(self.x + new_target_dx,
+                                  self.y + new_target_dy)
             return self.navigate(new_target, game_map, speed, True, max_corrections - 1, angular_step)
         speed = speed if (distance >= speed) else distance
-        return self.thrust(speed, angle)
+        return speed, angle
 
     def can_dock(self, planet):
         """
@@ -326,8 +331,10 @@ class Ship(Entity):
         :param dict[int, Planet] players: A dictionary of planet objects keyed by id
         :return: nothing
         """
-        self.owner = players.get(self.owner)  # All ships should have an owner. If not, this will just reset to None
-        self.planet = planets.get(self.planet)  # If not will just reset to none
+        self.owner = players.get(
+            self.owner)  # All ships should have an owner. If not, this will just reset to None
+        # If not will just reset to none
+        self.planet = planets.get(self.planet)
 
     @staticmethod
     def _parse_single(player_id, tokens):
@@ -368,7 +375,8 @@ class Ship(Entity):
         ships = {}
         num_ships, *remainder = tokens
         for _ in range(int(num_ships)):
-            ship_id, ships[ship_id], remainder = Ship._parse_single(player_id, remainder)
+            ship_id, ships[ship_id], remainder = Ship._parse_single(
+                player_id, remainder)
         return ships, remainder
 
 
