@@ -59,7 +59,7 @@ class Entity:
         :rtype: Position
         """
         angle = target.calculate_angle_between(self)
-        angle += 3 + self.id % 5
+        angle += 3 + self.id % 3
         radius = target.radius + min_distance
         x = target.x + radius * math.cos(math.radians(angle))
         y = target.y + radius * math.sin(math.radians(angle))

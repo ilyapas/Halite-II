@@ -20,7 +20,7 @@ class Starfighter(object):
         self.target = Vector(x, y)
         dist = (self.target - self.position).norm()
         if dist > 10:
-            self.flocking = 0.2
+            self.flocking = 0.3
         else:
             self.flocking = 0
 
@@ -34,7 +34,7 @@ class Starfighter(object):
 
         # self.apply_force(self.arrive(self.target))
         self.apply_force(self.flock(other_fighters) * self.flocking)
-        self.apply_force(self.avoid(obstacles) * 1.0)
+        self.apply_force(self.avoid(obstacles) * 0.5)
 
         self.velocity += self.acceleration
         self.velocity = self.velocity.limit(MAX_SPEED)
@@ -52,7 +52,7 @@ class Starfighter(object):
         return steer
 
     def arrive(self, target):
-        slow_down_zone = 5
+        slow_down_zone = 10
         desired = target - self.position
         dist = desired.norm()
         if dist < slow_down_zone:
@@ -69,7 +69,7 @@ class Starfighter(object):
         coh = self.cohesion(other_fighters)
         sep *= 1.5
         ali *= 1.0
-        coh *= 0.2
+        coh *= 0.0
         return sep + ali + coh
 
     def separate(self, targets):
@@ -98,7 +98,7 @@ class Starfighter(object):
         count = 0
         for target in targets:
             dist = (self.position - target.position).norm()
-            if dist > 0 and dist < neighborhood:
+            if dist > 0 and dist < neighborhood and target.velocity.norm() > 0:
                 average_velocity += target.velocity
                 count += 1
         if count > 0:
@@ -116,7 +116,7 @@ class Starfighter(object):
         count = 0
         for target in targets:
             dist = (self.position - target.position).norm()
-            if dist > 0 and dist < neighborhood:
+            if dist > 0 and dist < neighborhood and target.velocity.norm() > 0:
                 average_position += target.position
                 count += 1
         if count > 0:
@@ -132,7 +132,7 @@ class Starfighter(object):
         ahead2 = self.position + self.velocity.normalize() * max_see_ahead * 0.5
 
         def line_intersects_circle(ahead, ahead2, circle_center, circle_radius):
-            return (circle_center - ahead).norm <= circle_radius or (circle_center - ahead2).norm <= circle_radius
+            return (circle_center - ahead).norm() <= circle_radius or (circle_center - ahead2).norm() <= circle_radius
 
         most_threatening = None
         distance_to_most_threatening = 0

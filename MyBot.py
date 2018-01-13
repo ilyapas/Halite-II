@@ -36,7 +36,12 @@ while True:
         target = cc.select_target(ship)
         fighter = fighters[ship.id]
 
+        obstacles = game_map.all_planets()
+        if isinstance(target.entity, hlt.entity.Planet):
+            obstacles.remove(target.entity)
+
         if ship.can_dock(target.entity):
+            fighter.set_velocity(0, 0)
             command_queue.append(ship.dock(target.entity))
             continue
 
@@ -51,7 +56,7 @@ while True:
         fighter.set_target(target_point.x, target_point.y)
         other_fighters_position = [fighters[k]
                                    for k in fighters.keys() if k != ship.id]
-        fighter.update(other_fighters_position)
+        fighter.update(other_fighters_position, obstacles)
         command_queue.append(cmd(ship, fighter.velocity))
 
     game.send_command_queue(command_queue)
