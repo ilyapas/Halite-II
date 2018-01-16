@@ -24,8 +24,8 @@ class FlowField(object):
 
     def lookup_by_vector(self, position):
         force = self._apply_forces(position, self.planet_forces)
-        force = self._apply_forces(position, self.ship_forces)
-        return force
+        force += self._apply_forces(position, self.ship_forces)
+        return force.set_magnitude(6)
 
     def _apply_forces(self, position, forces):
         sum_forces = Vector()
@@ -35,7 +35,6 @@ class FlowField(object):
             gauss = force.magnitude * math.exp(-1 * force.kernel * distance)
             logging.info(f'diff {diff.set_magnitude(gauss)}')
             sum_forces += diff.set_magnitude(gauss)
-        sum_forces = sum_forces.set_magnitude(MAX_SPEED - 1)
         logging.info(f'sum {sum_forces}')
         return sum_forces
 
@@ -44,7 +43,8 @@ class FlowField(object):
         all_planets = self.game_map.all_planets()
         empty_planets = [p for p in all_planets if p.owner is None]
         own_planets = [p for p in all_planets if p.owner is me]
-        enemy_planets = [p for p in all_planets if p.owner is not me]
+        enemy_planets = [p for p in all_planets
+                         if p.owner is not me and p.owner is not None]
 
         forces = []
         forces += self._analyze_empty_planets(empty_planets)
@@ -55,16 +55,19 @@ class FlowField(object):
     def _analyze_empty_planets(self, planets):
         forces = []
         for planet in planets:
-            forces.append(Force(Vector(planet.x, planet.y), 0.0001, 1000.0))
+            forces.append(Force(Vector(planet.x, planet.y), 0.1, 200.0))
         return forces
 
     def _analyze_own_planets(self, planets):
-        return list()
+        forces = []
+        for planet in planets:
+            forces.append(Force(Vector(planet.x, planet.y), 0.1, -200.0))
+        return forces
 
     def _analyze_enemy_planets(self, planets):
         forces = []
         for planet in planets:
-            forces.append(Force(Vector(planet.x, planet.y), 0.0001, -1000.0))
+            forces.append(Force(Vector(planet.x, planet.y), 0.1, 200.0))
         return forces
 
     def _analyze_ships(self):
@@ -81,11 +84,11 @@ class FlowField(object):
     def _analyze_own_ships(self, ships):
         forces = []
         for ship in ships:
-            forces.append(Force(Vector(ship.x, ship.y), 0.00001, -100.0))
+            forces.append(Force(Vector(ship.x, ship.y), 1, -200.0))
         return forces
 
     def _analyze_enemy_ships(self, ships):
         forces = []
         for ship in ships:
-            forces.append(Force(Vector(ship.x, ship.y), 0.0001, 1000.0))
+            forces.append(Force(Vector(ship.x, ship.y), 0.1, 200.0))
         return forces
