@@ -2,6 +2,7 @@
 """
 import hlt
 import logging
+import command_center as cc
 from flow_field import FlowField
 
 game = hlt.Game("Starfighter-v1")
@@ -24,15 +25,19 @@ while True:
         if ship.docking_status != ship.DockingStatus.UNDOCKED:
             continue
 
-        planets = {k: v for k, v in game_map.nearby_entities_by_distance(ship).items()
-                   if isinstance(v[0], hlt.entity.Planet)}
-        nearest_planet = sorted(zip(planets.keys(), planets.values()))[0][1][0]
+        nearest_planet = cc.find_nearest_planet(ship, game_map)
 
-        if ship.can_dock(nearest_planet) and not nearest_planet.is_full():
-            command_queue.append(ship.dock(nearest_planet))
+        if ship.can_dock(nearest_planet.entity) and not nearest_planet.entity.is_full():
+            command_queue.append(ship.dock(nearest_planet.entity))
             continue
 
-        command_queue.append(cmd(ship, field.lookup(ship.x, ship.y)))
+        if nearest_planet.distance < 20:
+            speed = 5
+        else:
+            speed = hlt.constants.MAX_SPEED
+
+        command_queue.append(cmd(ship, field.lookup(
+            ship.x, ship.y).set_magnitude(speed)))
 
     game.send_command_queue(command_queue)
     # TURN END
