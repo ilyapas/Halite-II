@@ -122,6 +122,6 @@ class FlowField(object):
             nearby_enemy_ships = cc.find_nearby_ships(
                 ship, self.game_map, 30, [lambda s, g: s.owner is not g.get_me()])
             kernel = 0.1
-            magnitude = 100 + (-0 * len(nearby_enemy_ships))
+            magnitude = 100 + (-5 * len(nearby_enemy_ships))
             forces.append(Force(Vector(ship.x, ship.y), kernel, magnitude))
         return forces

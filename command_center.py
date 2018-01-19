@@ -135,3 +135,11 @@ def find_nearest_ship(ship, game_map, filters=[]):
 
 def find_nearby_ships(target, game_map, radius, filters=[]):
     return find_nearby_entities(hlt.entity.Ship, target, game_map, radius, filters)
+
+
+def get_default_direction(ship, game_map):
+    enemy_ships = [s for s in game_map._all_ships()
+                   if s.owner is not game_map.get_me()]
+    average_position_x = sum([s.x for s in enemy_ships]) / len(enemy_ships)
+    average_position_y = sum([s.y for s in enemy_ships]) / len(enemy_ships)
+    return ship.calculate_angle_between(hlt.entity.Position(average_position_x, average_position_y))
