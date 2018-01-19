@@ -111,8 +111,8 @@ class FlowField(object):
         for ship in ships:
             nearby_own_ships = cc.find_nearby_ships(
                 ship, self.game_map, 30, [lambda s, g: s.owner is g.get_me()])
-            kernel = 1
-            magnitude = -200 + (-0 * len(nearby_own_ships))
+            kernel = 1 / max(1, len(nearby_own_ships))
+            magnitude = -200
             forces.append(Force(Vector(ship.x, ship.y), kernel, magnitude))
         return forces
 
@@ -121,7 +121,7 @@ class FlowField(object):
         for ship in ships:
             nearby_enemy_ships = cc.find_nearby_ships(
                 ship, self.game_map, 30, [lambda s, g: s.owner is not g.get_me()])
-            kernel = 0.1
-            magnitude = 100 + (-5 * len(nearby_enemy_ships))
+            kernel = 0.1 / max(1, len(nearby_enemy_ships))
+            magnitude = 100
             forces.append(Force(Vector(ship.x, ship.y), kernel, magnitude))
         return forces
