@@ -4,6 +4,59 @@ import math
 from collections import namedtuple
 
 Target = namedtuple('Target', ['entity', 'distance'])
+TargetOption = namedtuple('TargetOption', ['priority', 'squad_size', 'target'])
+
+
+class CommandCenter(object):
+    def __init__(self):
+        self.average_radius = 0
+        self.game_map = None
+
+    def set_map(self, game_map):
+        self.game_map = game_map
+        if self.average_radius == 0:
+            self.average_radius = calc_average_radius(game_map)
+
+    def select_target(self, ship, desired_angle):
+        options = []
+
+        options.append(TargetOption(priority=5, squad_size=1, target=find_nearest_planet(
+            ship, self.game_map, [is_enemy_or_mine_and_full])))
+
+        options.append(TargetOption(priority=7, squad_size=1, target=find_nearest_planet(
+            ship, self.game_map, [is_enemy_or_mine_and_full, lambda p, g: p.radius < self.average_radius])))
+
+        options.append(TargetOption(priority=12, squad_size=1, target=find_nearest_ship(
+            ship, self.game_map, [lambda s, g: s.owner == g.get_me()])))
+
+        nearest_large_enemy_planet = find_nearest_planet(
+            ship, self.game_map, [lambda p, g: p.owner == g.get_me(), lambda p, g: p.radius < self.average_radius])
+        if nearest_large_enemy_planet.entity is not None:
+            docked_enemy_ship = find_nearest_ship(
+                ship, self.game_map, [lambda s, g: s.id not in nearest_large_enemy_planet.entity.all_docked_ships()])
+            options.append(TargetOption(
+                priority=15, squad_size=1, target=docked_enemy_ship))
+
+        nearest_enemy_planet = find_nearest_planet(
+            ship, self.game_map, [lambda p, g: p.owner == g.get_me()])
+        if nearest_enemy_planet.entity is not None:
+            docked_enemy_ship = find_nearest_ship(
+                ship, self.game_map, [lambda s, g: s.id not in nearest_enemy_planet.entity.all_docked_ships()])
+            options.append(TargetOption(
+                priority=12, squad_size=1, target=docked_enemy_ship))
+
+        def evaluate_option(opt):
+            if opt.target.entity is None:
+                return math.inf
+            angle = ship.calculate_angle_between(opt.target.entity)
+            result = opt.target.distance / opt.priority
+            result *= 1 / math.exp(-math.fabs(angle - desired_angle))
+            logging.info((result, opt))
+            return result
+
+        best_option = sorted(options, key=evaluate_option)[0]
+
+        return best_option.target
 
 
 def calc_average_radius(game_map):
