@@ -3,7 +3,7 @@
 import hlt
 import logging
 from flow_field import FlowField
-from command_center import CommandCenter, find_nearest_planet, get_default_direction
+from command_center import CommandCenter, find_nearest_planet, get_default_direction, is_enemy_or_mine_and_full
 from collections import defaultdict
 
 
@@ -39,7 +39,7 @@ while True:
 
         nearest_planet = find_nearest_planet(ship, game_map)
 
-        if ship.can_dock(nearest_planet.entity) and not nearest_planet.entity.is_full():
+        if ship.can_dock(nearest_planet.entity) and not is_enemy_or_mine_and_full(nearest_planet.entity, game_map):
             command_queue.append(ship.dock(nearest_planet.entity))
             continue
 
@@ -52,6 +52,10 @@ while True:
                 speed=int(hlt.constants.MAX_SPEED),
                 ignore_ships=False,
                 angular_step=3)
+            if speed == 0:
+                speed = hlt.constants.MAX_SPEED
+                angle = desired_direction.argument()
+                logging.info(f'going with the gradient {angle}')
             commands[ship.id] = (speed, angle)
             cmd_count += 1
         else:
@@ -59,6 +63,7 @@ while True:
             if speed == 0:
                 speed = hlt.constants.MAX_SPEED
                 angle = get_default_direction(ship, game_map)
+                logging.info(f'default direction {angle}')
 
         command_queue.append(ship.thrust(speed, angle))
 
