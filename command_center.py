@@ -50,7 +50,7 @@ class CommandCenter(object):
                 return math.inf
             angle = ship.calculate_angle_between(opt.target.entity)
             result = opt.target.distance / opt.priority
-            result *= 1 / math.exp(-math.fabs(angle - desired_angle))
+            result *= 1 - math.exp(- 0.001 * (angle - desired_angle)**2)
             logging.info((result, opt))
             return result
 

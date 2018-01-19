@@ -35,7 +35,7 @@ class FlowField(object):
         for force in forces:
             diff = force.origin - position
             distance = diff.norm()
-            gauss = force.magnitude * math.exp(-1 * force.kernel * distance)
+            gauss = force.magnitude * math.exp(-1 * force.kernel * distance**2)
             logging.info(f'diff {diff.set_magnitude(gauss)}')
             sum_forces += diff.set_magnitude(gauss)
         logging.info(f'sum {sum_forces}')
