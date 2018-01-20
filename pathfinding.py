@@ -5,7 +5,7 @@ from hlt.entity import Entity, Ship, Planet, Position
 
 
 def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_corrections=90, angular_step=1,
-             ignore_ships=False, ignore_planets=False):
+             ignore_ships=False, ignore_planets=False, clockwise=True, iteration=0):
     """
     Move a ship to a specific target position (Entity). It is recommended to place the position
     itself here, else navigate will crash into the target. If avoid_obstacles is set to True (default)
@@ -20,7 +20,7 @@ def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_correction
     :param bool avoid_obstacles: Whether to avoid the obstacles in the way (simple pathfinding).
     :param int max_corrections: The maximum number of degrees to deviate per turn while trying to pathfind. If exceeded returns None.
     :param int angular_step: The degree difference to deviate if the original destination has obstacles
-    :param bool ignore_ships: Whether to ignore ships in calculations (this will make your movement faster, but more precarious)
+    :param bool ignore_ships: Whether to ignore ships in calkculations (this will make your movement faster, but more precarious)
     :param bool ignore_planets: Whether to ignore planets in calculations (useful if you want to crash onto planets)
     :return string: The command trying to be passed to the Halite engine or None if movement is not possible within max_corrections degrees.
     :rtype: str
@@ -35,12 +35,20 @@ def navigate(ship, target, game_map, speed, avoid_obstacles=True, max_correction
         else Planet if (ignore_planets and not ignore_ships) \
         else Entity
     if avoid_obstacles and game_map.obstacles_between(ship, target, ignore):
+        iteration += 1
+        if clockwise:
+            new_angle = angle - iteration * angular_step
+            clockwise = False
+        else:
+            new_angle = angle + iteration * angular_step
+            clockwise = True
+
         new_target_dx = math.cos(math.radians(
-            angle + angular_step)) * distance
+            new_angle)) * distance
         new_target_dy = math.sin(math.radians(
-            angle + angular_step)) * distance
+            new_angle)) * distance
         new_target = Position(ship.x + new_target_dx,
                               ship.y + new_target_dy)
-        return ship.navigate(new_target, game_map, speed, True, max_corrections - 1, angular_step)
+        return navigate(ship, new_target, game_map, speed, True, max_corrections - 1, angular_step, clockwise=clockwise, iteration=iteration)
     speed = speed if (distance >= speed) else distance
     return speed, angle
