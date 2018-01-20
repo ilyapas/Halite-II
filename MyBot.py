@@ -13,9 +13,12 @@ TARGET_RECALC = True
 RUSH_THRESHOLD = 2.5
 FLEE_THRESHOLD = 0.3
 
+init = True
 rush = 0
 flee = math.inf
+planet_bonus = 0
 nav_count = 0
+last_target = None
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'squad_size', 'target'])
 squads = defaultdict(set)
@@ -90,10 +93,10 @@ def find_nearest_ship(ship, game_map, filters=[]):
 def find_new_target(ship, game_map, desired_angle=None):
     options = []
 
-    options.append(TargetOption(priority=5, squad_size=1, target=find_nearest_planet(
+    options.append(TargetOption(priority=5 + planet_bonus, squad_size=1, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full])))
 
-    options.append(TargetOption(priority=7, squad_size=1, target=find_nearest_planet(
+    options.append(TargetOption(priority=7 + planet_bonus, squad_size=1, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full, lambda p, g: p.radius < average_radius])))
 
     nearest_enemy_ship = find_nearest_ship(
@@ -128,8 +131,18 @@ def find_new_target(ship, game_map, desired_angle=None):
     options.append(TargetOption(
         priority=1000, squad_size=1, target=fleeing_target))
 
+    global last_target
+    global init
+
     def evaluate_option(opt):
-        result = opt.target.distance / opt.priority
+        distance = opt.target.distance
+        logging.info(f'last target {last_target}')
+        logging.info(f'opt.target.entity {opt.target.entity}')
+        if init and last_target and opt.target.entity:
+            if opt.target.entity.id == last_target:
+                distance = math.inf
+
+        result = distance / opt.priority
         if desired_angle:
             if opt.target.entity is None:
                 return math.inf
@@ -139,7 +152,7 @@ def find_new_target(ship, game_map, desired_angle=None):
         return result
 
     sorted_options = sorted(options, key=evaluate_option)
-
+    last_target = sorted_options[0].target.entity.id
     return sorted_options[0]
 
 
@@ -208,7 +221,6 @@ def fleeing_feasable(game_map):
 
 game = hlt.Game("Settler-v14")
 logging.info("Starting my Settler bot!")
-init = True
 
 while True:
     game_map = game.update_map()
@@ -224,7 +236,9 @@ while True:
 
         if rush_feasable(game_map):
             rush = 1
-        init = False
+
+        if len(game_map.all_players()) > 2:
+            planet_bonus = 12
 
     if fleeing_feasable(game_map):
         flee = 1
@@ -280,5 +294,6 @@ while True:
     # logging.info(f'targets {len(targets)}')
     nav_count = 0
     game.send_command_queue(command_queue)
+    init = False
     # TURN END
 # GAME END
