@@ -12,13 +12,15 @@ CLUSTER = 3
 TARGET_RECALC = True
 RUSH_THRESHOLD = 2.5
 FLEE_THRESHOLD = 0.3
+BORDER_PLANET_THRESHOLD = 30
+PLANET_4P_BONUS = 7
 
 init = True
 rush = 0
 flee = math.inf
 planet_bonus = 0
 nav_count = 0
-last_target = None
+last_targets = []
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'squad_size', 'target'])
 squads = defaultdict(set)
@@ -52,6 +54,15 @@ def is_enemy_or_mine_and_full(planet, game_map):
         else:
             return True
     return False
+
+
+def far_from_borders(planet, game_map):
+    if planet.x < BORDER_PLANET_THRESHOLD or \
+            planet.x > game_map.width - BORDER_PLANET_THRESHOLD or \
+            planet.y < BORDER_PLANET_THRESHOLD or \
+            planet.y > game_map.height - BORDER_PLANET_THRESHOLD:
+        return False
+    return True
 
 
 def is_ship_stuck(ship):
@@ -93,6 +104,9 @@ def find_nearest_ship(ship, game_map, filters=[]):
 def find_new_target(ship, game_map, desired_angle=None):
     options = []
 
+    options.append(TargetOption(priority=5 + 2 * planet_bonus, squad_size=1, target=find_nearest_planet(
+        ship, game_map, [is_enemy_or_mine_and_full, far_from_borders])))
+
     options.append(TargetOption(priority=5 + planet_bonus, squad_size=1, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full])))
 
@@ -131,15 +145,15 @@ def find_new_target(ship, game_map, desired_angle=None):
     options.append(TargetOption(
         priority=1000, squad_size=1, target=fleeing_target))
 
-    global last_target
+    global last_targets
     global init
 
     def evaluate_option(opt):
         distance = opt.target.distance
-        logging.info(f'last target {last_target}')
+        logging.info(f'last targets {last_targets}')
         logging.info(f'opt.target.entity {opt.target.entity}')
-        if init and last_target and opt.target.entity:
-            if opt.target.entity.id == last_target:
+        if init and opt.target.entity:
+            if opt.target.entity.id in last_targets:
                 distance = math.inf
 
         result = distance / opt.priority
@@ -152,7 +166,8 @@ def find_new_target(ship, game_map, desired_angle=None):
         return result
 
     sorted_options = sorted(options, key=evaluate_option)
-    last_target = sorted_options[0].target.entity.id
+    if init and sorted_options[0].target.entity:
+        last_targets.append(sorted_options[0].target.entity.id)
     return sorted_options[0]
 
 
@@ -219,6 +234,23 @@ def fleeing_feasable(game_map):
     return ruuuun
 
 
+def calc_planet_bonus(game_map):
+    if len(game_map.all_players()) < 4:
+        return 0
+    my_ship = game_map.get_me().all_ships()[0]
+    enemy_ship = find_nearest_ship(
+        my_ship, game_map, [lambda s, g: s.owner == g.get_me()]).entity
+    nearest_planet = find_nearest_planet(my_ship, game_map).entity
+    distance_to_enemy = my_ship.calculate_distance_between(enemy_ship)
+    distance_to_planet = my_ship.calculate_distance_between(
+        nearest_planet)
+    logging.info(
+        f'PLANET BONUS: distance_to_enemy {distance_to_enemy} distance_to_planet {distance_to_planet}')
+    if distance_to_enemy / distance_to_planet > 3:
+        return PLANET_4P_BONUS
+    return 0
+
+
 game = hlt.Game("Settler-v14")
 logging.info("Starting my Settler bot!")
 
@@ -227,6 +259,7 @@ while True:
     # field = FlowField(game_map)
 
     if init:
+        planet_bonus = calc_planet_bonus(game_map)
         planets = [p for p in game_map.all_planets()]
         planets_by_size = list(
             reversed(sorted(planets, key=lambda p: p.radius)))
@@ -236,9 +269,6 @@ while True:
 
         if rush_feasable(game_map):
             rush = 1
-
-        if len(game_map.all_players()) > 2:
-            planet_bonus = 12
 
     if fleeing_feasable(game_map):
         flee = 1
