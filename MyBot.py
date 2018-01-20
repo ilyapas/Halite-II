@@ -9,7 +9,9 @@ from flow_field import FlowField
 
 CLUSTER = 3
 TARGET_RECALC = True
+RUSH_THRESHOLD = 2.5
 
+rush = 0
 nav_count = 0
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'squad_size', 'target'])
@@ -91,7 +93,7 @@ def find_new_target(ship, game_map, desired_angle=None):
     options.append(TargetOption(priority=7, squad_size=1, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full, lambda p, g: p.radius < average_radius])))
 
-    options.append(TargetOption(priority=12, squad_size=1, target=find_nearest_ship(
+    options.append(TargetOption(priority=12 + rush * 200, squad_size=1, target=find_nearest_ship(
         ship, game_map, [lambda s, g: s.owner == g.get_me()])))
 
     nearest_large_enemy_planet = find_nearest_planet(
@@ -146,6 +148,26 @@ def navigate_to(target, ship, game_map):
             navigate_command[0], navigate_command[1]))
 
 
+def rush_feasable(game_map):
+    if len(game_map.all_players()) > 2:
+        return False
+
+    my_ship = game_map.get_me().all_ships()[0]
+    enemy_ship = find_nearest_ship(
+        my_ship, game_map, [lambda s, g: s.owner == g.get_me()]).entity
+    nearest_planet_for_enemy = find_nearest_planet(enemy_ship, game_map).entity
+
+    distance_to_enemy = my_ship.calculate_distance_between(enemy_ship)
+    enemy_distance_to_planet = enemy_ship.calculate_distance_between(
+        nearest_planet_for_enemy)
+    go_go_go = (distance_to_enemy / enemy_distance_to_planet) < RUSH_THRESHOLD
+    logging.info(
+        f'RUSH: distance_to_enemy {distance_to_enemy} enemy_distance_to_planet {enemy_distance_to_planet}')
+    if go_go_go:
+        logging.info("GO GO GO!!!")
+    return go_go_go
+
+
 game = hlt.Game("Settler-v13")
 logging.info("Starting my Settler bot!")
 init = True
@@ -161,6 +183,9 @@ while True:
 
         rad_list = [p.radius for p in game_map.all_planets()]
         average_radius = sum(rad_list) / len(rad_list)
+
+        if rush_feasable(game_map):
+            rush = 1
         init = False
 
     all_ship_ids = [ship.id for ship in game_map._all_ships()]
