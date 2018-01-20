@@ -17,7 +17,7 @@ class CommandCenter(object):
         if self.average_radius == 0:
             self.average_radius = calc_average_radius(game_map)
 
-    def select_target(self, ship, desired_angle):
+    def select_target(self, ship, desired_angle=None):
         options = []
 
         options.append(TargetOption(priority=5, squad_size=1, target=find_nearest_planet(
@@ -46,11 +46,12 @@ class CommandCenter(object):
                 priority=12, squad_size=1, target=docked_enemy_ship))
 
         def evaluate_option(opt):
-            if opt.target.entity is None:
-                return math.inf
-            angle = ship.calculate_angle_between(opt.target.entity)
             result = opt.target.distance / opt.priority
-            result *= 1 - math.exp(- 0.001 * (angle - desired_angle)**2)
+            if desired_angle:
+                if opt.target.entity is None:
+                    return math.inf
+                angle = ship.calculate_angle_between(opt.target.entity)
+                result *= 1 - math.exp(- 0.001 * (angle - desired_angle)**2)
             logging.info((result, opt))
             return result
 
