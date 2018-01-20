@@ -3,6 +3,7 @@
 import hlt
 import logging
 import math
+import pathfinding
 from collections import defaultdict
 from collections import namedtuple
 from flow_field import FlowField
@@ -145,12 +146,12 @@ def find_new_target(ship, game_map, desired_angle=None):
 def navigate_to(target, ship, game_map):
     global assignees
     global targets
-    navigate_command = ship.navigate(
-        ship.closest_point_to(target),
-        game_map,
-        speed=int(hlt.constants.MAX_SPEED),
-        ignore_ships=False,
-        angular_step=3)
+    navigate_command = pathfinding.navigate(ship,
+                                            ship.closest_point_to(target),
+                                            game_map,
+                                            speed=int(hlt.constants.MAX_SPEED),
+                                            ignore_ships=False,
+                                            angular_step=3)
 
     if navigate_command:
         global nav_count
@@ -205,7 +206,7 @@ def fleeing_feasable(game_map):
     return ruuuun
 
 
-game = hlt.Game("Settler-v13")
+game = hlt.Game("Settler-v14")
 logging.info("Starting my Settler bot!")
 init = True
 

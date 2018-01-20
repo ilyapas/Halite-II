@@ -5,10 +5,15 @@ import logging
 import math
 from collections import defaultdict
 from collections import namedtuple
+from flow_field import FlowField
 
 CLUSTER = 3
 TARGET_RECALC = True
+RUSH_THRESHOLD = 2.5
+FLEE_THRESHOLD = 0.3
 
+rush = 0
+flee = math.inf
 nav_count = 0
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'squad_size', 'target'])
@@ -81,7 +86,7 @@ def find_nearest_ship(ship, game_map, filters=[]):
     return find_nearest_entity(hlt.entity.Ship, ship, game_map, filters)
 
 
-def find_new_target(ship, game_map):
+def find_new_target(ship, game_map, desired_angle=None):
     options = []
 
     options.append(TargetOption(priority=5, squad_size=1, target=find_nearest_planet(
@@ -90,8 +95,10 @@ def find_new_target(ship, game_map):
     options.append(TargetOption(priority=7, squad_size=1, target=find_nearest_planet(
         ship, game_map, [is_enemy_or_mine_and_full, lambda p, g: p.radius < average_radius])))
 
-    options.append(TargetOption(priority=12, squad_size=1, target=find_nearest_ship(
-        ship, game_map, [lambda s, g: s.owner == g.get_me()])))
+    nearest_enemy_ship = find_nearest_ship(
+        ship, game_map, [lambda s, g: s.owner == g.get_me()])
+    options.append(TargetOption(priority=12 + rush * 200,
+                                squad_size=1, target=nearest_enemy_ship))
 
     nearest_large_enemy_planet = find_nearest_planet(
         ship, game_map, [lambda p, g: p.owner == g.get_me(), lambda p, g: p.radius < average_radius])
@@ -109,8 +116,24 @@ def find_new_target(ship, game_map):
         options.append(TargetOption(
             priority=12, squad_size=1, target=docked_enemy_ship))
 
+    pos_x = ship.x - 2 * (nearest_enemy_ship.entity.x - ship.x)
+    pos_y = ship.y - 2 * (nearest_enemy_ship.entity.y - ship.y)
+    if pos_x < 10 or pos_x > game_map.width - 10:
+        pos_x = ship.x
+    if pos_y < 10 or pos_y > game_map.height - 10:
+        pos_y = ship.y
+    fleeing_direction = hlt.entity.Position(pos_x, pos_y)
+    fleeing_target = Target(fleeing_direction, flee)
+    options.append(TargetOption(
+        priority=1000, squad_size=1, target=fleeing_target))
+
     def evaluate_option(opt):
         result = opt.target.distance / opt.priority
+        if desired_angle:
+            if opt.target.entity is None:
+                return math.inf
+            angle = ship.calculate_angle_between(opt.target.entity)
+            result *= 1 - math.exp(-0.1 * (angle - desired_angle)**2)
         logging.info((result, opt))
         return result
 
@@ -140,12 +163,55 @@ def navigate_to(target, ship, game_map):
             navigate_command[0], navigate_command[1]))
 
 
-game = hlt.Game("Settler-v12")
+def rush_feasable(game_map):
+    if len(game_map.all_players()) > 2:
+        return False
+
+    my_ship = game_map.get_me().all_ships()[0]
+    enemy_ship = find_nearest_ship(
+        my_ship, game_map, [lambda s, g: s.owner == g.get_me()]).entity
+    nearest_planet_for_enemy = find_nearest_planet(enemy_ship, game_map).entity
+
+    distance_to_enemy = my_ship.calculate_distance_between(enemy_ship)
+    enemy_distance_to_planet = enemy_ship.calculate_distance_between(
+        nearest_planet_for_enemy)
+    go_go_go = (distance_to_enemy / enemy_distance_to_planet) < RUSH_THRESHOLD
+    logging.info(
+        f'RUSH: distance_to_enemy {distance_to_enemy} enemy_distance_to_planet {enemy_distance_to_planet}')
+    if go_go_go:
+        logging.info("GO GO GO!!!")
+    return go_go_go
+
+
+def fleeing_feasable(game_map):
+    if len(game_map.all_players()) < 4:
+        return False
+
+    if len([p for p in game_map.all_planets() if not p.is_owned()]) > 1:
+        return False
+
+    num_own_planets = len(
+        [p for p in game_map.all_planets() if p.owner == game_map.get_me()])
+    num_planets_stats = []
+    for player in game_map.all_players():
+        num_planets_stats.append(
+            len([p for p in game_map.all_planets() if p.owner == player]))
+    max_num_planents = max(num_planets_stats) + 1
+    ruuuun = (num_own_planets / max_num_planents) < FLEE_THRESHOLD
+    logging.info(
+        f'FLEE: num_own_planets {num_own_planets} max_num_planents {max_num_planents}')
+    if ruuuun:
+        logging.info("RUUUUN!!!")
+    return ruuuun
+
+
+game = hlt.Game("Settler-v13")
 logging.info("Starting my Settler bot!")
 init = True
 
 while True:
     game_map = game.update_map()
+    # field = FlowField(game_map)
 
     if init:
         planets = [p for p in game_map.all_planets()]
@@ -154,7 +220,13 @@ while True:
 
         rad_list = [p.radius for p in game_map.all_planets()]
         average_radius = sum(rad_list) / len(rad_list)
+
+        if rush_feasable(game_map):
+            rush = 1
         init = False
+
+    if fleeing_feasable(game_map):
+        flee = 1
 
     all_ship_ids = [ship.id for ship in game_map._all_ships()]
 
@@ -182,6 +254,7 @@ while True:
             target = None
 
         if target is None or TARGET_RECALC:
+            # desired_direction = field.lookup(ship.x, ship.y)
             t = find_new_target(ship, game_map)
             if t.target.entity is not None:
                 key = entity_key(t.target.entity)
