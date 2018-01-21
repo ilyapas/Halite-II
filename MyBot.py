@@ -20,7 +20,6 @@ rush = 0
 flee = math.inf
 planet_bonus = 0
 nav_count = 0
-last_targets = []
 Target = namedtuple('Target', ['entity', 'distance'])
 TargetOption = namedtuple('TargetOption', ['priority', 'squad_size', 'target'])
 squads = defaultdict(set)
@@ -145,17 +144,8 @@ def find_new_target(ship, game_map, desired_angle=None):
     options.append(TargetOption(
         priority=1000, squad_size=1, target=fleeing_target))
 
-    global last_targets
-    global init
-
     def evaluate_option(opt):
         distance = opt.target.distance
-        logging.info(f'last targets {last_targets}')
-        logging.info(f'opt.target.entity {opt.target.entity}')
-        if init and opt.target.entity:
-            if opt.target.entity.id in last_targets:
-                distance = math.inf
-
         result = distance / opt.priority
         if desired_angle:
             if opt.target.entity is None:
@@ -166,8 +156,6 @@ def find_new_target(ship, game_map, desired_angle=None):
         return result
 
     sorted_options = sorted(options, key=evaluate_option)
-    if init and sorted_options[0].target.entity:
-        last_targets.append(sorted_options[0].target.entity.id)
     return sorted_options[0]
 
 
@@ -188,8 +176,7 @@ def navigate_to(target, ship, game_map):
         assignees[entity_key(target)].add(ship.id)
         logging.info(f'target for ship {ship.id}: {entity_key(target)}')
         logging.info(assignees[entity_key(target)])
-        command_queue.append(ship.thrust(
-            navigate_command[0], navigate_command[1]))
+    return navigate_command
 
 
 def rush_feasable(game_map):
@@ -317,11 +304,12 @@ while True:
                 if ship.can_dock(target):
                     command_queue.append(ship.dock(target))
                     continue
-            navigate_to(target, ship, game_map)
+            speed, angle = navigate_to(target, ship, game_map)
+            command_queue.append(ship.thrust(speed, angle))
 
-    # logging.info(f'nav_count {nav_count}')
-    # logging.info(f'ships_counts {len(game_map.get_me().all_ships())}')
-    # logging.info(f'targets {len(targets)}')
+        # logging.info(f'nav_count {nav_count}')
+        # logging.info(f'ships_counts {len(game_map.get_me().all_ships())}')
+        # logging.info(f'targets {len(targets)}')
     nav_count = 0
     game.send_command_queue(command_queue)
     init = False
