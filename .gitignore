@@ -1,6 +1,5 @@
 *.hlt
 *.log
-*.zip
 __pycache__
 *.pyc
 .vscode
