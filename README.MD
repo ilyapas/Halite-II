@@ -1,16 +1,10 @@
-# Using your starter kit
+# Bot developed for the Halite-II artificial intelligence competition
 
-All starter kits should contain a `run_game.sh` and `run_game.bash`, you can use these scripts to quickly run a game of halite. By default, this script runs the basic __Settler__ bot against itself.
+## Running the bot
+For letting the bot play against the my previous bot version, execute `run_game.bat` or `gym.bat <number of runs>`.
+For 4-player games, execute `run_game4.bat` or `gym4.bat <number of runs>`.
 
-## Bot submission guidelines
-
-Before submitting a bot, make sure you adhere to our guidelines, or the upload or compilation of your bot will fail.
-
-1. You should have a `MyBot.{extension for language}` in the root folder of your zip. For Rust, this should be a `cargo.toml`
-2. If you are building on top of starter kit provided by us, make sure to include the hlt folder.
-
-## Uploading your bot
-
-* Website: You can use the [play page](https://halite.io/play-programming-challenge) in the Halite website to submit your bot.
-* Halite Client: If you want a command line experience, you can use the [Halite Client tool](https://halite.io/learn-programming-challenge/halite-cli-and-tools/halite-client-tools) to upload your bot.
-
+## Information about the Halite-II competition
+* [Halite-II Website](https://halite.io/)
+* [Basic Game Rules](https://halite.io/learn-programming-challenge/basic-game-rules/)
+* [Contest Rules](https://halite.io/learn-programming-challenge/contest-rules/)
